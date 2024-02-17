@@ -1,37 +1,44 @@
 import streamlit as st
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing import image
-from tensorflow.keras.applications.inception_v3 import preprocess_input, decode_predictions
+import tensorflow as tf
+from PIL import Image
 import numpy as np
 
-# Load the pretrained model
-model = load_model('pretrained_model.h5')
+# Load the TensorFlow model
+model = tf.saved_model.load("saved_model.pb")
 
-def predict_image(img_path):
-    img = image.load_img(img_path, target_size=(299, 299))
-    img_array = image.img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0)
-    img_array = preprocess_input(img_array)
+# Define the function to make predictions
+def predict(image):
+    # Preprocess the image
+    img_array = np.array(image)
+    img_array = tf.image.resize(img_array, [224, 224])
+    img_array = img_array / 255.0
+    img_array = tf.expand_dims(img_array, 0)  # Add batch dimension
 
-    predictions = model.predict(img_array)
-    decoded_predictions = decode_predictions(predictions, top=1)[0]
+    # Make prediction
+    result = model(img_array)
 
-    return decoded_predictions[0][1]
+    # Get the predicted label
+    predicted_label = tf.argmax(result, axis=1).numpy()[0]
 
+    return predicted_label
+
+# Streamlit app
 def main():
-    st.title("Image Classification App")
+    st.title("Image Classification with Pretrained Model")
 
-    uploaded_file = st.file_uploader("Choose an image...", type="jpg")
+    # Upload image through Streamlit
+    uploaded_image = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
-    if uploaded_file is not None:
-        st.image(uploaded_file, caption="Uploaded Image.", use_column_width=True)
-        st.write("")
-        st.write("Classifying...")
+    if uploaded_image is not None:
+        # Display the uploaded image
+        st.image(uploaded_image, caption="Uploaded Image", use_column_width=True)
 
-        # Make prediction
-        result = predict_image(uploaded_file)
-        
-        st.write(f"Prediction: {result}")
+        # Preprocess and make prediction
+        image = Image.open(uploaded_image)
+        label = predict(image)
 
-if __name__ == '__main__':
+        # Display the result label
+        st.write(f"Prediction: Class {label}")
+
+if __name__ == "__main__":
     main()
